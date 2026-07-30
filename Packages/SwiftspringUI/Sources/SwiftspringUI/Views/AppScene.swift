@@ -13,9 +13,12 @@ public struct SwiftspringAppScene: Scene {
         WindowGroup {
             RootMailboxView(environment: environment)
                 .preferredColorScheme(colorScheme)
+                #if os(macOS)
+                .frame(minWidth: 900, minHeight: 600)
+                #endif
         }
+
         #if os(macOS)
-        .defaultSize(width: 1280, height: 820)
         Settings {
             PreferencesView(environment: environment)
         }
