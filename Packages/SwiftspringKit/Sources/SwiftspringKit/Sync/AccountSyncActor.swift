@@ -155,7 +155,7 @@ public actor AccountSyncActor {
         // for MVP we create/update based on ThreadingEngine keys within this batch + DB subject match.
         for header in headers {
             let key = ThreadingEngine.threadKey(for: header)
-            var thread = threadMap[key] ?? Thread(
+            var thread = threadMap[key] ?? MailThread(
                 accountId: accountId,
                 subject: ThreadingEngine.normalizedSubject(header.subject).isEmpty
                     ? header.subject
