@@ -9,9 +9,10 @@ struct SwiftspringiOSApp: App {
 
     init() {
         BackgroundSyncCoordinator.register()
-        BackgroundSyncCoordinator.schedule()
-        let env = (try? AppEnvironment.bootstrap(demo: true))
+        let env = (try? AppEnvironment.bootstrap())
             ?? (try! AppEnvironment.preview())
+        BackgroundSyncCoordinator.bind(syncEngine: env.syncEngine)
+        BackgroundSyncCoordinator.schedule()
         _environment = StateObject(wrappedValue: env)
     }
 

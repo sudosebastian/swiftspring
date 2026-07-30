@@ -90,6 +90,7 @@ public struct OAuthUserProfile: Sendable, Equatable {
 public enum OAuthError: Error, LocalizedError, Sendable {
     case invalidAuthorizationURL
     case missingCode
+    case stateMismatch
     case tokenExchangeFailed(String)
     case profileFetchFailed
 
@@ -97,6 +98,7 @@ public enum OAuthError: Error, LocalizedError, Sendable {
         switch self {
         case .invalidAuthorizationURL: return "Could not build OAuth authorization URL."
         case .missingCode: return "OAuth callback did not include an authorization code."
+        case .stateMismatch: return "OAuth callback state did not match the authorization request."
         case .tokenExchangeFailed(let message): return "Token exchange failed: \(message)"
         case .profileFetchFailed: return "Could not load the user profile."
         }

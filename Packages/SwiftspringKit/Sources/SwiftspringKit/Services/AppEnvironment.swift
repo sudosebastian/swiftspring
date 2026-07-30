@@ -66,17 +66,24 @@ public final class AppEnvironment: ObservableObject {
         self.mail.contacts = self.contacts
     }
 
-    public static func bootstrap(demo: Bool = true) throws -> AppEnvironment {
+    /// Boots the shared application environment.
+    /// - Parameter demo: When `true`, uses in-memory credentials and the demo transport.
+    ///   Defaults to `false` so device/macOS launches use Keychain + real MailCore.
+    ///   Override with `SWIFTSPRING_DEMO=1` for local demo runs. The iOS Simulator
+    ///   always uses the demo transport (MailCore IMAP is unreliable there).
+    public static func bootstrap(demo: Bool = false) throws -> AppEnvironment {
+        let envFlag = ProcessInfo.processInfo.environment["SWIFTSPRING_DEMO"]?.lowercased()
+        let wantDemo = demo || envFlag == "1" || envFlag == "true"
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("Swiftspring", isDirectory: true)
         let db = try AppDatabase.open(in: support)
         #if targetEnvironment(simulator)
         let useDemo = true
         #else
-        let useDemo = demo
+        let useDemo = wantDemo
         #endif
-        // Prefer Keychain on device; fall back to memory when unavailable in previews/tests.
-        let creds: CredentialStore = demo ? InMemoryCredentialStore() : KeychainCredentialStore()
+        // Prefer Keychain on device; use memory only for explicit demo runs.
+        let creds: CredentialStore = wantDemo ? InMemoryCredentialStore() : KeychainCredentialStore()
         return AppEnvironment(database: db, credentials: creds, useDemoTransport: useDemo)
     }
 

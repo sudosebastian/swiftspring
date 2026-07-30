@@ -96,8 +96,10 @@ public final class ComposeService: ObservableObject {
         try repository.upsertMessage(draft)
         try repository.saveBody(MessageBody(messageId: draft.id, html: htmlBody, plainText: plainBody))
 
+        // Replace attachments on each save so repeated autosaves do not duplicate rows.
+        try repository.deleteAttachments(messageId: draft.id)
         for url in attachmentURLs {
-            let data = try Data(contentsOf: url)
+            let data = try readSecurityScopedData(from: url)
             var file = AttachmentFile(
                 messageId: draft.id,
                 accountId: draft.accountId,
@@ -115,6 +117,16 @@ public final class ComposeService: ObservableObject {
         draft.hasAttachments = !attachmentURLs.isEmpty
         try repository.upsertMessage(draft)
         self.draft = draft
+    }
+
+    private func readSecurityScopedData(from url: URL) throws -> Data {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return try Data(contentsOf: url)
     }
 
     public func send(undoDelaySeconds: Int = 5) async throws {

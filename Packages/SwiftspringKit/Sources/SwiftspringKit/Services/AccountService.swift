@@ -13,6 +13,8 @@ public final class AccountService: ObservableObject {
     public var googleClientId: String
     public var microsoftClientId: String
     private let transportFactory: @Sendable () -> any MailTransport
+    /// CSRF `state` for the in-flight OAuth authorization request.
+    private var pendingOAuthState: String?
 
     public init(
         repository: MailRepository,
@@ -69,8 +71,15 @@ public final class AccountService: ObservableObject {
 
     public func completeOAuth(
         provider: MailProvider,
-        code: String
+        code: String,
+        state: String? = nil
     ) async throws -> Account {
+        guard let state, let pending = pendingOAuthState, state == pending else {
+            pendingOAuthState = nil
+            throw OAuthError.stateMismatch
+        }
+        pendingOAuthState = nil
+
         let config: OAuthConfiguration
         switch provider {
         case .gmail:
@@ -116,12 +125,15 @@ public final class AccountService: ObservableObject {
     }
 
     public func authorizationURL(for provider: MailProvider) throws -> URL {
+        let state = UUID().uuidString
+        pendingOAuthState = state
         switch provider {
         case .gmail:
-            return try oauth.authorizationURL(config: .google(clientId: googleClientId))
+            return try oauth.authorizationURL(config: .google(clientId: googleClientId), state: state)
         case .office365, .outlook:
-            return try oauth.authorizationURL(config: .microsoft(clientId: microsoftClientId))
+            return try oauth.authorizationURL(config: .microsoft(clientId: microsoftClientId), state: state)
         default:
+            pendingOAuthState = nil
             throw OAuthError.invalidAuthorizationURL
         }
     }

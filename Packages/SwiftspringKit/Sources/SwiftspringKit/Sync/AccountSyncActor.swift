@@ -151,35 +151,50 @@ public actor AccountSyncActor {
         var threadMap: [String: MailThread] = [:]
         var messages: [Message] = []
 
-        // Load existing threads keyed by first message-id when possible is expensive;
-        // for MVP we create/update based on ThreadingEngine keys within this batch + DB subject match.
         for header in headers {
+            let existing = try existingMessage(for: header, folderId: folder.id)
             let key = ThreadingEngine.threadKey(for: header)
-            var thread = threadMap[key] ?? MailThread(
-                accountId: accountId,
-                subject: ThreadingEngine.normalizedSubject(header.subject).isEmpty
-                    ? header.subject
-                    : header.subject,
-                folderIds: [folder.id]
-            )
-            if threadMap[key] == nil {
-                // Try find existing by subject + participants later; new id for now.
-                thread.subject = header.subject
-                thread.firstMessageAt = header.date
+            let isNewMessage = existing == nil
+
+            var thread: MailThread
+            if let mapped = threadMap[key] {
+                thread = mapped
+            } else if let existing,
+                      let prior = try repository.thread(id: existing.threadId) {
+                thread = prior
+            } else if let headerMessageId = header.headerMessageId,
+                      let related = try repository.message(headerMessageId: headerMessageId),
+                      let prior = try repository.thread(id: related.threadId) {
+                thread = prior
+            } else {
+                thread = MailThread(
+                    accountId: accountId,
+                    subject: header.subject,
+                    folderIds: [folder.id],
+                    firstMessageAt: header.date
+                )
             }
+
+            thread.subject = header.subject.isEmpty ? thread.subject : header.subject
             thread.snippet = header.snippet.isEmpty ? thread.snippet : header.snippet
             thread.unread = thread.unread || header.unread
             thread.starred = thread.starred || header.starred
             thread.participants = uniqueAddresses(thread.participants + header.from + header.to)
             thread.lastMessageReceivedAt = max(thread.lastMessageReceivedAt, header.date)
-            thread.messageCount += 1
-            if header.hasAttachments { thread.attachmentCount += 1 }
+            if thread.firstMessageAt > header.date {
+                thread.firstMessageAt = header.date
+            }
+            if isNewMessage {
+                thread.messageCount += 1
+                if header.hasAttachments { thread.attachmentCount += 1 }
+            }
             if !thread.folderIds.contains(folder.id) {
                 thread.folderIds.append(folder.id)
             }
             threadMap[key] = thread
 
-            let message = Message(
+            var message = Message(
+                id: existing?.id ?? EntityID(),
                 accountId: accountId,
                 threadId: thread.id,
                 folderId: folder.id,
@@ -193,8 +208,16 @@ public actor AccountSyncActor {
                 date: header.date,
                 unread: header.unread,
                 starred: header.starred,
-                hasAttachments: header.hasAttachments
+                hasAttachments: header.hasAttachments,
+                bodyFetched: existing?.bodyFetched ?? false
             )
+            if let existing {
+                message.replyToHeaderMessageId = existing.replyToHeaderMessageId
+                message.draft = existing.draft
+                message.pristine = existing.pristine
+                message.bcc = existing.bcc
+                message.replyTo = existing.replyTo
+            }
             messages.append(message)
         }
 
@@ -203,11 +226,25 @@ public actor AccountSyncActor {
 
         var updatedFolder = folder
         if let maxUID = headers.map(\.uid).max() {
-            updatedFolder.uidNext = maxUID + 1
+            let next = maxUID + 1
+            updatedFolder.uidNext = max(updatedFolder.uidNext ?? 0, next)
         }
-        updatedFolder.totalCount = max(updatedFolder.totalCount, messages.count)
-        updatedFolder.unreadCount = messages.filter(\.unread).count
+        let stats = try repository.messageStats(folderId: folder.id)
+        updatedFolder.totalCount = stats.total
+        updatedFolder.unreadCount = stats.unread
         try repository.upsertFolder(updatedFolder)
+    }
+
+    private func existingMessage(for header: RemoteMessageHeader, folderId: EntityID) throws -> Message? {
+        if let byUID = try repository.message(folderId: folderId, imapUID: header.uid) {
+            return byUID
+        }
+        if let headerMessageId = header.headerMessageId,
+           let byHeader = try repository.message(headerMessageId: headerMessageId),
+           byHeader.folderId == folderId {
+            return byHeader
+        }
+        return nil
     }
 
     private func execute(_ task: MailTask) async throws {

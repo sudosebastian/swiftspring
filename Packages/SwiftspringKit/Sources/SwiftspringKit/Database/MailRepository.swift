@@ -101,14 +101,7 @@ public struct MailRepository: Sendable {
     public func upsertThread(_ thread: MailThread) throws {
         try db.dbWriter.write { db in
             try thread.save(db)
-            for folderId in thread.folderIds {
-                try db.execute(
-                    sql: """
-                    INSERT OR IGNORE INTO threadFolder (threadId, folderId) VALUES (?, ?)
-                    """,
-                    arguments: [thread.id, folderId]
-                )
-            }
+            try replaceThreadFolders(db: db, threadId: thread.id, folderIds: thread.folderIds)
         }
     }
 
@@ -116,15 +109,20 @@ public struct MailRepository: Sendable {
         try db.dbWriter.write { db in
             for thread in threads {
                 try thread.save(db)
-                for folderId in thread.folderIds {
-                    try db.execute(
-                        sql: """
-                        INSERT OR IGNORE INTO threadFolder (threadId, folderId) VALUES (?, ?)
-                        """,
-                        arguments: [thread.id, folderId]
-                    )
-                }
+                try replaceThreadFolders(db: db, threadId: thread.id, folderIds: thread.folderIds)
             }
+        }
+    }
+
+    private func replaceThreadFolders(db: Database, threadId: EntityID, folderIds: [EntityID]) throws {
+        try db.execute(sql: "DELETE FROM threadFolder WHERE threadId = ?", arguments: [threadId])
+        for folderId in folderIds {
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO threadFolder (threadId, folderId) VALUES (?, ?)
+                """,
+                arguments: [threadId, folderId]
+            )
         }
     }
 
@@ -212,6 +210,40 @@ public struct MailRepository: Sendable {
         }
     }
 
+    public func message(folderId: EntityID, imapUID: Int64) throws -> Message? {
+        try db.dbWriter.read { db in
+            try Message
+                .filter(Column("folderId") == folderId && Column("imapUID") == imapUID)
+                .fetchOne(db)
+        }
+    }
+
+    public func message(headerMessageId: String) throws -> Message? {
+        let trimmed = headerMessageId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return try db.dbWriter.read { db in
+            try Message
+                .filter(Column("headerMessageId") == trimmed)
+                .fetchOne(db)
+        }
+    }
+
+    public func messageStats(folderId: EntityID) throws -> (total: Int, unread: Int) {
+        try db.dbWriter.read { db in
+            let total = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM message WHERE folderId = ?",
+                arguments: [folderId]
+            ) ?? 0
+            let unread = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM message WHERE folderId = ? AND unread = 1",
+                arguments: [folderId]
+            ) ?? 0
+            return (total, unread)
+        }
+    }
+
     public func observeMessages(threadId: EntityID) -> AnyPublisher<[Message], Error> {
         ValueObservation
             .tracking { db in
@@ -254,6 +286,22 @@ public struct MailRepository: Sendable {
             try AttachmentFile
                 .filter(Column("messageId") == messageId)
                 .fetchAll(db)
+        }
+    }
+
+    public func deleteAttachments(messageId: EntityID) throws {
+        try db.dbWriter.write { db in
+            let existing = try AttachmentFile
+                .filter(Column("messageId") == messageId)
+                .fetchAll(db)
+            for file in existing {
+                if let path = file.localPath {
+                    try? FileManager.default.removeItem(atPath: path)
+                }
+            }
+            _ = try AttachmentFile
+                .filter(Column("messageId") == messageId)
+                .deleteAll(db)
         }
     }
 

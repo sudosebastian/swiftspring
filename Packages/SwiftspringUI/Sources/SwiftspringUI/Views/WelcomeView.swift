@@ -118,10 +118,13 @@ public struct WelcomeView: View {
         errorMessage = nil
         defer { isBootstrapping = false }
         do {
+            let accountId: EntityID?
             if environment.accounts.accounts.isEmpty {
-                _ = try await environment.accounts.addDemoAccount()
+                accountId = try await environment.accounts.addDemoAccount().id
+            } else {
+                accountId = environment.accounts.accounts.first?.id
             }
-            environment.mail.loadFolders(accountId: environment.accounts.accounts.first?.id)
+            environment.mail.loadFolders(accountId: accountId)
             await environment.syncEngine.startAll()
             onContinue()
         } catch {

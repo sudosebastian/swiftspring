@@ -1,5 +1,4 @@
 import Foundation
-import SwiftspringKit
 
 #if canImport(BackgroundTasks)
 import BackgroundTasks
@@ -10,6 +9,15 @@ public enum BackgroundSyncCoordinator {
     public static let refreshTaskIdentifier = "com.swiftspring.sync.refresh"
 
     @MainActor
+    private static var syncEngine: SyncEngine?
+
+    /// Bind the live sync engine so background refresh can sync the open mailbox.
+    @MainActor
+    public static func bind(syncEngine: SyncEngine) {
+        self.syncEngine = syncEngine
+    }
+
+    @MainActor
     public static func register() {
         #if os(iOS)
         BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskIdentifier, using: nil) { task in
@@ -18,11 +26,12 @@ public enum BackgroundSyncCoordinator {
                 return
             }
             schedule()
-            Task {
-                do {
-                    // Apps should hold AppEnvironment and call syncEngine.startAll().
-                    refresh.setTaskCompleted(success: true)
-                }
+            let work = Task {
+                let success = await performRefresh()
+                refresh.setTaskCompleted(success: success)
+            }
+            refresh.expirationHandler = {
+                work.cancel()
             }
         }
         #endif
@@ -34,6 +43,27 @@ public enum BackgroundSyncCoordinator {
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         try? BGTaskScheduler.shared.submit(request)
         #endif
+    }
+
+    /// Runs sync via the bound engine, or a standalone engine against the shared DB.
+    public static func performRefresh() async -> Bool {
+        if let engine = await MainActor.run(body: { syncEngine }) {
+            await engine.startAll()
+            return true
+        }
+        do {
+            let db = try AppGroupStore.openSharedDatabase()
+            let repository = MailRepository(db: db)
+            let engine = SyncEngine(
+                repository: repository,
+                credentials: KeychainCredentialStore(),
+                transportFactory: { MailTransportFactory.make() }
+            )
+            await engine.startAll()
+            return true
+        } catch {
+            return false
+        }
     }
 }
 

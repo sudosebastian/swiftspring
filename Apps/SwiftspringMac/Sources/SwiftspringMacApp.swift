@@ -8,7 +8,7 @@ struct SwiftspringMacApp: App {
     @AppStorage("swiftspring.appearance") private var appearance = "system"
 
     init() {
-        let env = (try? AppEnvironment.bootstrap(demo: true))
+        let env = (try? AppEnvironment.bootstrap())
             ?? (try! AppEnvironment.preview())
         _environment = StateObject(wrappedValue: env)
     }

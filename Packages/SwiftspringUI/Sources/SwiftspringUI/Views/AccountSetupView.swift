@@ -112,8 +112,9 @@ public struct AccountSetupView: View {
                 Section {
                     Button("Add Demo Account") {
                         Task {
-                            _ = try? await environment.accounts.addDemoAccount()
-                            environment.mail.loadFolders(accountId: environment.accounts.accounts.first?.id)
+                            if let account = try? await environment.accounts.addDemoAccount() {
+                                environment.mail.loadFolders(accountId: account.id)
+                            }
                         }
                     }
                 }
@@ -152,7 +153,7 @@ public struct AccountSetupView: View {
             var smtp = ProviderPresets.settings(for: provider, email: email).smtp
             if !imapHost.isEmpty { imap.host = imapHost }
             if !smtpHost.isEmpty { smtp.host = smtpHost }
-            _ = try await environment.accounts.addIMAPAccount(
+            let account = try await environment.accounts.addIMAPAccount(
                 name: name.isEmpty ? email : name,
                 email: email,
                 provider: provider,
@@ -160,7 +161,7 @@ public struct AccountSetupView: View {
                 imap: imap,
                 smtp: smtp
             )
-            environment.mail.loadFolders(accountId: environment.accounts.accounts.first?.id)
+            environment.mail.loadFolders(accountId: account.id)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -178,8 +179,13 @@ public struct AccountSetupView: View {
                   let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
                 throw OAuthError.missingCode
             }
-            _ = try await environment.accounts.completeOAuth(provider: provider, code: code)
-            environment.mail.loadFolders(accountId: environment.accounts.accounts.first?.id)
+            let state = components.queryItems?.first(where: { $0.name == "state" })?.value
+            let account = try await environment.accounts.completeOAuth(
+                provider: provider,
+                code: code,
+                state: state
+            )
+            environment.mail.loadFolders(accountId: account.id)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
