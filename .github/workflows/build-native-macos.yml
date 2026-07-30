@@ -7,20 +7,23 @@ on:
       - "Apps/**"
       - "Packages/**"
       - "project.yml"
-      - "scripts/generate-xcode.sh"
+      - "scripts/**"
       - ".github/workflows/build-native-macos.yml"
   workflow_dispatch:
 
 jobs:
   build-macos:
     name: Build SwiftspringMac
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: |
+          # Prefer newest installed Xcode on the runner
+          sudo xcode-select -s /Applications/Xcode.app || sudo xcode-select -s /Applications/Xcode_16.4.app || true
+          xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -53,8 +56,8 @@ jobs:
           mkdir -p dist
           APP=$(find build/DerivedData/Build/Products -name 'Swiftspring.app' -type d | head -1)
           echo "Found: $APP"
+          test -n "$APP"
           ditto "$APP" dist/Swiftspring.app
-          # Zip for download (Gatekeeper: user may need right-click → Open)
           ditto -c -k --sequesterRsrc --keepParent dist/Swiftspring.app dist/Swiftspring-macOS-debug.zip
           ls -lh dist/
 
@@ -68,7 +71,7 @@ jobs:
 
   test-kit:
     name: Test SwiftspringKit
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: swift test

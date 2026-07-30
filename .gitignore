@@ -85,6 +85,7 @@ client_secret.json
 .swiftpm/
 .build/
 Packages/**/.build/
+Packages/**/Package.resolved
 DerivedData/
 *.xcodeproj
 !project.yml
