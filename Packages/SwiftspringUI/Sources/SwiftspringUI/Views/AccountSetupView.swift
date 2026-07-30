@@ -118,6 +118,7 @@ public struct AccountSetupView: View {
                     }
                 }
             }
+            .tint(SwiftspringBrand.spruceBright)
             .navigationTitle("Accounts")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

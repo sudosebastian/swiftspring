@@ -1,0 +1,76 @@
+name: Build Native macOS
+
+on:
+  push:
+    branches: [master, "cursor/**"]
+    paths:
+      - "Apps/**"
+      - "Packages/**"
+      - "project.yml"
+      - "scripts/generate-xcode.sh"
+      - ".github/workflows/build-native-macos.yml"
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build SwiftspringMac
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: ./scripts/generate-xcode.sh
+
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Swiftspring.xcodeproj \
+            -scheme SwiftspringMac
+
+      - name: Build (unsigned Debug)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Swiftspring.xcodeproj \
+            -scheme SwiftspringMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Stage app
+        run: |
+          mkdir -p dist
+          APP=$(find build/DerivedData/Build/Products -name 'Swiftspring.app' -type d | head -1)
+          echo "Found: $APP"
+          ditto "$APP" dist/Swiftspring.app
+          # Zip for download (Gatekeeper: user may need right-click → Open)
+          ditto -c -k --sequesterRsrc --keepParent dist/Swiftspring.app dist/Swiftspring-macOS-debug.zip
+          ls -lh dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swiftspring-macOS-debug
+          path: dist/Swiftspring-macOS-debug.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  test-kit:
+    name: Test SwiftspringKit
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift test
+        working-directory: Packages/SwiftspringKit
+        run: swift test

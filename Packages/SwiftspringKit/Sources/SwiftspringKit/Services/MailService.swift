@@ -148,7 +148,9 @@ public final class MailService: ObservableObject {
 
     private func ensureBodies(for messages: [Message]) async {
         for message in messages {
-            try? contacts?.remember(from: message)
+            if let contacts {
+                try? contacts.remember(from: message)
+            }
             if !message.bodyFetched {
                 try? await syncEngine.fetchBody(accountId: message.accountId, messageId: message.id)
             }
