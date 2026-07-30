@@ -26,6 +26,11 @@ public struct AccountSetupView: View {
     public var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    SwiftspringWordmark(size: 28, showTagline: true)
+                        .padding(.vertical, 4)
+                }
+
                 Section("Provider") {
                     Picker("Provider", selection: $provider) {
                         ForEach(MailProvider.allCases) { item in

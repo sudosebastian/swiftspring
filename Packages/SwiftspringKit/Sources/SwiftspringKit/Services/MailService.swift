@@ -14,14 +14,16 @@ public final class MailService: ObservableObject {
 
     public let repository: MailRepository
     public let syncEngine: SyncEngine
+    public var contacts: ContactService?
 
     private var folderCancellable: AnyCancellable?
     private var threadCancellable: AnyCancellable?
     private var messageCancellable: AnyCancellable?
 
-    public init(repository: MailRepository, syncEngine: SyncEngine) {
+    public init(repository: MailRepository, syncEngine: SyncEngine, contacts: ContactService? = nil) {
         self.repository = repository
         self.syncEngine = syncEngine
+        self.contacts = contacts
     }
 
     public func loadFolders(accountId: EntityID?) {
@@ -145,8 +147,11 @@ public final class MailService: ObservableObject {
     }
 
     private func ensureBodies(for messages: [Message]) async {
-        for message in messages where !message.bodyFetched {
-            try? await syncEngine.fetchBody(accountId: message.accountId, messageId: message.id)
+        for message in messages {
+            try? contacts?.remember(from: message)
+            if !message.bodyFetched {
+                try? await syncEngine.fetchBody(accountId: message.accountId, messageId: message.id)
+            }
         }
     }
 }

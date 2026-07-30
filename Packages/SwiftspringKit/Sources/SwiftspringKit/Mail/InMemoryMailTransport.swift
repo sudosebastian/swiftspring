@@ -23,45 +23,116 @@ public actor InMemoryMailTransport: MailTransport {
                     uid: 1,
                     headerMessageId: "<welcome@swiftspring.local>",
                     subject: "Welcome to Swiftspring",
-                    snippet: "Your native Apple mail client is ready.",
+                    snippet: "Your native Apple mail client is ready — local sync, no Chromium.",
                     from: [EmailAddress(name: "Swiftspring", email: "hello@swiftspring.app")],
                     to: [EmailAddress(email: "you@example.com")],
-                    date: now.addingTimeInterval(-3600),
+                    date: now.addingTimeInterval(-7200),
                     unread: true,
                     starred: true
                 ),
                 RemoteMessageHeader(
                     uid: 2,
-                    headerMessageId: "<native@swiftspring.local>",
-                    subject: "Native macOS & iOS sync",
-                    snippet: "In-process IMAP with GRDB and SwiftUI.",
-                    from: [EmailAddress(name: "Engineering", email: "eng@swiftspring.app")],
+                    headerMessageId: "<design@swiftspring.local>",
+                    subject: "A calmer reading pane",
+                    snippet: "Spruce accents, serif wordmark, and HTML that respects dark mode.",
+                    from: [EmailAddress(name: "Maya Chen", email: "maya@studio.example")],
                     to: [EmailAddress(email: "you@example.com")],
-                    date: now.addingTimeInterval(-1800),
+                    date: now.addingTimeInterval(-5400),
                     unread: true
                 ),
                 RemoteMessageHeader(
                     uid: 3,
+                    headerMessageId: "<native@swiftspring.local>",
+                    subject: "Native macOS & iOS sync",
+                    snippet: "In-process IMAP with GRDB and SwiftUI — half the idle RAM of Electron.",
+                    from: [EmailAddress(name: "Engineering", email: "eng@swiftspring.app")],
+                    to: [EmailAddress(email: "you@example.com")],
+                    date: now.addingTimeInterval(-3600),
+                    unread: true
+                ),
+                RemoteMessageHeader(
+                    uid: 4,
+                    headerMessageId: "<invite@swiftspring.local>",
+                    subject: "Coffee next week?",
+                    snippet: "Are you free Thursday afternoon for a walk through the plan?",
+                    from: [EmailAddress(name: "Jordan Lee", email: "jordan@friends.example")],
+                    to: [EmailAddress(email: "you@example.com")],
+                    date: now.addingTimeInterval(-1800),
+                    unread: false
+                ),
+                RemoteMessageHeader(
+                    uid: 5,
                     headerMessageId: "<tips@swiftspring.local>",
                     subject: "Tips for a fast inbox",
-                    snippet: "Archive, star, and search without Chromium overhead.",
+                    snippet: "Archive, star, snooze, and search without leaving the keyboard.",
                     from: [EmailAddress(name: "Tips", email: "tips@swiftspring.app")],
                     to: [EmailAddress(email: "you@example.com")],
                     date: now.addingTimeInterval(-600),
+                    unread: false,
+                    hasAttachments: true
+                ),
+            ]
+            headersByFolder["Sent"] = [
+                RemoteMessageHeader(
+                    uid: 1,
+                    headerMessageId: "<sent-hello@swiftspring.local>",
+                    subject: "Re: Coffee next week?",
+                    snippet: "Thursday works — let's meet at 3.",
+                    from: [EmailAddress(email: "you@example.com")],
+                    to: [EmailAddress(name: "Jordan Lee", email: "jordan@friends.example")],
+                    date: now.addingTimeInterval(-900),
                     unread: false
                 ),
             ]
             bodies["INBOX:1"] = RemoteMessageBody(
-                html: "<h1>Welcome</h1><p>Swiftspring runs natively on macOS and iOS.</p>",
-                plainText: "Welcome\n\nSwiftspring runs natively on macOS and iOS."
+                html: """
+                <div style="font-family:-apple-system,sans-serif;line-height:1.5;color:#141F23">
+                <p style="font-size:22px;font-weight:600;margin:0 0 12px">Welcome aboard.</p>
+                <p>Swiftspring is a <strong>fully native</strong> mail client for Mac and iPhone.
+                Sync runs in-process. Your credentials stay in Keychain.</p>
+                <p style="color:#1E7370">Try starring this thread, then search for “native”.</p>
+                </div>
+                """,
+                plainText: "Welcome aboard.\n\nSwiftspring is a fully native mail client for Mac and iPhone."
             )
             bodies["INBOX:2"] = RemoteMessageBody(
-                html: "<p>Sync uses MailCore2 behind a Swift actor. UI reads from GRDB.</p>",
-                plainText: "Sync uses MailCore2 behind a Swift actor. UI reads from GRDB."
+                html: """
+                <p>Hey — the reading pane now uses a sand/mist atmosphere and spruce accents so long threads feel less clinical.</p>
+                <blockquote>Brand first. One job per surface. Motion with purpose.</blockquote>
+                <p>— Maya</p>
+                """,
+                plainText: "Hey — the reading pane now uses a sand/mist atmosphere..."
             )
             bodies["INBOX:3"] = RemoteMessageBody(
-                html: "<p>Try starring threads and using local FTS search.</p>",
-                plainText: "Try starring threads and using local FTS search."
+                html: """
+                <p>Architecture snapshot:</p>
+                <ul>
+                <li>SwiftUI mailbox on macOS &amp; iOS</li>
+                <li>GRDB + SQLite as the UI source of truth</li>
+                <li>MailCore2 behind a Swift <code>MailTransport</code></li>
+                </ul>
+                <p>No Electron. No JSON stdin bridge.</p>
+                """,
+                plainText: "Architecture snapshot: SwiftUI, GRDB, MailCore2. No Electron."
+            )
+            bodies["INBOX:4"] = RemoteMessageBody(
+                html: "<p>Are you free Thursday afternoon for a walk through the plan? Coffee on me.</p><p>— Jordan</p>",
+                plainText: "Are you free Thursday afternoon for a walk through the plan?"
+            )
+            bodies["INBOX:5"] = RemoteMessageBody(
+                html: """
+                <p><strong>Keyboard-friendly tips</strong></p>
+                <ol>
+                <li>⌘N — new message</li>
+                <li>⌘R — sync all accounts</li>
+                <li>Right-click a thread — archive, snooze, star</li>
+                </ol>
+                """,
+                plainText: "Keyboard-friendly tips: ⌘N compose, ⌘R sync, context menu for archive/snooze."
+            )
+            bodies["Sent:1"] = RemoteMessageBody(
+                html: "<p>Thursday works — let's meet at 3.</p>",
+                plainText: "Thursday works — let's meet at 3."
             )
         }
     }

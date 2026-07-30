@@ -25,10 +25,35 @@ public struct HTMLMessageView: View {
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; font-src data:;">
         <style>
           :root { color-scheme: light dark; }
-          body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; word-wrap: break-word; }
+          body {
+            font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+            word-wrap: break-word;
+            color: #141F23;
+          }
+          @media (prefers-color-scheme: dark) {
+            body { color: #EDF5F3; }
+            a { color: #7DCDC8; }
+            blockquote { border-left-color: #1E7370; color: #A8C2BF; }
+          }
           img { max-width: 100%; height: auto; }
-          a { color: #0B57D0; }
-          blockquote { border-left: 3px solid #ccc; margin-left: 0; padding-left: 12px; color: #666; }
+          a { color: #1E7370; }
+          blockquote {
+            border-left: 3px solid #1E7370;
+            margin-left: 0;
+            padding-left: 12px;
+            color: #4A6664;
+          }
+          code {
+            font-family: ui-monospace, Menlo, monospace;
+            font-size: 0.92em;
+            background: rgba(30,115,112,0.1);
+            padding: 0.1em 0.35em;
+            border-radius: 4px;
+          }
         </style>
         </head>
         <body>\(body)</body>

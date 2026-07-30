@@ -40,6 +40,12 @@ SwiftUI → MailService.queue(task)
        → ValueObservation → SwiftUI
 ```
 
-## Electron reference
+# Visual language
 
-The legacy Electron tree under `app/` is a **behavior reference** only. Do not port Flux/React code line-by-line. See `MIGRATION.md`.
+Swiftspring uses a **spruce / mist** palette with a serif wordmark:
+
+- Spruce `#0F3D3E` / bright `#1E7370`
+- Mist `#EDF5F3` and sand `#F5EEE0` atmosphere gradients
+- Coral `#DB5E4A` for errors only
+
+First launch shows `WelcomeView` (brand-first), then the three-column mailbox with avatars, sync status bar, and richer demo mail.

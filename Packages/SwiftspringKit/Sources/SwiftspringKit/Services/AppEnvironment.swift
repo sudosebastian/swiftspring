@@ -63,6 +63,7 @@ public final class AppEnvironment: ObservableObject {
         self.contacts = ContactService(repository: repository)
         self.notifications = NotificationService()
         self.calendar = CalendarService(repository: repository)
+        self.mail.contacts = self.contacts
     }
 
     public static func bootstrap(demo: Bool = true) throws -> AppEnvironment {
