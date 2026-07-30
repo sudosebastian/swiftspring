@@ -1,0 +1,64 @@
+name: Swiftspring
+options:
+  bundleIdPrefix: com.swiftspring
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  SwiftspringKit:
+    path: Packages/SwiftspringKit
+  SwiftspringUI:
+    path: Packages/SwiftspringUI
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  SwiftspringMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Apps/SwiftspringMac/Sources
+    resources:
+      - path: Apps/SwiftspringMac/Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.swiftspring.mac
+        PRODUCT_NAME: Swiftspring
+        INFOPLIST_FILE: Apps/SwiftspringMac/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/SwiftspringMac/Resources/SwiftspringMac.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+    dependencies:
+      - package: SwiftspringKit
+      - package: SwiftspringUI
+    scheme:
+      testTargets: []
+
+  SwiftspringiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Apps/SwiftspringiOS/Sources
+    resources:
+      - path: Apps/SwiftspringiOS/Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.swiftspring.ios
+        PRODUCT_NAME: Swiftspring
+        INFOPLIST_FILE: Apps/SwiftspringiOS/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/SwiftspringiOS/Resources/SwiftspringiOS.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks"
+    dependencies:
+      - package: SwiftspringKit
+      - package: SwiftspringUI
+    scheme:
+      testTargets: []
