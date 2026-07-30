@@ -4,12 +4,12 @@ import Combine
 @MainActor
 public final class MailService: ObservableObject {
     @Published public private(set) var folders: [MailFolder] = []
-    @Published public private(set) var threads: [Thread] = []
+    @Published public private(set) var threads: [MailThread] = []
     @Published public private(set) var selectedFolder: MailFolder?
-    @Published public private(set) var selectedThread: Thread?
+    @Published public private(set) var selectedThread: MailThread?
     @Published public private(set) var messages: [Message] = []
     @Published public var searchQuery: String = ""
-    @Published public var searchResults: [Thread] = []
+    @Published public var searchResults: [MailThread] = []
     @Published public var statusMessage: String?
 
     public let repository: MailRepository
@@ -60,7 +60,7 @@ public final class MailService: ObservableObject {
             })
     }
 
-    public func selectThread(_ thread: Thread) {
+    public func selectThread(_ thread: MailThread) {
         selectedThread = thread
         messageCancellable = repository.observeMessages(threadId: thread.id)
             .receive(on: DispatchQueue.main)

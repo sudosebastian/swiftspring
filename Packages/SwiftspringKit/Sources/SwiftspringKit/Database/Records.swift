@@ -140,7 +140,7 @@ extension MailLabel: FetchableRecord, PersistableRecord {
     }
 }
 
-extension Thread: FetchableRecord, PersistableRecord {
+extension MailThread: FetchableRecord, PersistableRecord {
     public static let databaseTableName = "thread"
 
     public init(row: Row) throws {

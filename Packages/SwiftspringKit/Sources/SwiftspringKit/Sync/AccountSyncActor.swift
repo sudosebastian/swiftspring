@@ -148,7 +148,7 @@ public actor AccountSyncActor {
         let headers = try await transport.fetchHeaders(folderPath: folder.path, startUID: folder.uidNext, limit: 200)
         guard !headers.isEmpty else { return }
 
-        var threadMap: [String: Thread] = [:]
+        var threadMap: [String: MailThread] = [:]
         var messages: [Message] = []
 
         // Load existing threads keyed by first message-id when possible is expensive;

@@ -98,7 +98,7 @@ public struct MailRepository: Sendable {
 
     // MARK: - Threads
 
-    public func upsertThread(_ thread: Thread) throws {
+    public func upsertThread(_ thread: MailThread) throws {
         try db.dbWriter.write { db in
             try thread.save(db)
             for folderId in thread.folderIds {
@@ -112,7 +112,7 @@ public struct MailRepository: Sendable {
         }
     }
 
-    public func upsertThreads(_ threads: [Thread]) throws {
+    public func upsertThreads(_ threads: [MailThread]) throws {
         try db.dbWriter.write { db in
             for thread in threads {
                 try thread.save(db)
@@ -128,10 +128,10 @@ public struct MailRepository: Sendable {
         }
     }
 
-    public func threads(folderId: EntityID?, limit: Int = 100, offset: Int = 0) throws -> [Thread] {
+    public func threads(folderId: EntityID?, limit: Int = 100, offset: Int = 0) throws -> [MailThread] {
         try db.dbWriter.read { db in
             if let folderId {
-                return try Thread.fetchAll(
+                return try MailThread.fetchAll(
                     db,
                     sql: """
                     SELECT thread.* FROM thread
@@ -150,17 +150,17 @@ public struct MailRepository: Sendable {
         }
     }
 
-    public func thread(id: EntityID) throws -> Thread? {
+    public func thread(id: EntityID) throws -> MailThread? {
         try db.dbWriter.read { db in
-            try Thread.fetchOne(db, key: id)
+            try MailThread.fetchOne(db, key: id)
         }
     }
 
-    public func observeThreads(folderId: EntityID?) -> AnyPublisher<[Thread], Error> {
+    public func observeThreads(folderId: EntityID?) -> AnyPublisher<[MailThread], Error> {
         ValueObservation
-            .tracking { [folderId] db -> [Thread] in
+            .tracking { [folderId] db -> [MailThread] in
                 if let folderId {
-                    return try Thread.fetchAll(
+                    return try MailThread.fetchAll(
                         db,
                         sql: """
                         SELECT thread.* FROM thread
@@ -282,7 +282,7 @@ public struct MailRepository: Sendable {
 
     // MARK: - Search
 
-    public func searchThreads(query: String, limit: Int = 50) throws -> [Thread] {
+    public func searchThreads(query: String, limit: Int = 50) throws -> [MailThread] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               let pattern = FTS5Pattern(matchingAllTokensIn: trimmed) else { return [] }
@@ -295,7 +295,7 @@ public struct MailRepository: Sendable {
             ORDER BY rank
             LIMIT ?
             """
-            return try Thread.fetchAll(db, sql: sql, arguments: [pattern, limit])
+            return try MailThread.fetchAll(db, sql: sql, arguments: [pattern, limit])
         }
     }
 

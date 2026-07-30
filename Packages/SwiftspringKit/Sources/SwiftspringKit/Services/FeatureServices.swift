@@ -17,10 +17,10 @@ public struct SearchService: Sendable {
 }
 
 public struct SearchResults: Sendable {
-    public var threads: [Thread]
+    public var threads: [MailThread]
     public var messages: [Message]
 
-    public init(threads: [Thread], messages: [Message]) {
+    public init(threads: [MailThread], messages: [Message]) {
         self.threads = threads
         self.messages = messages
     }

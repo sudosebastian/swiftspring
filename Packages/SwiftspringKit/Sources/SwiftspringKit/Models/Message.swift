@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Thread: Identifiable, Codable, Sendable, Equatable {
+public struct MailThread: Identifiable, Codable, Sendable, Equatable {
     public var id: EntityID
     public var accountId: EntityID
     public var subject: String

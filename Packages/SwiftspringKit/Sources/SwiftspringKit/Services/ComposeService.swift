@@ -20,7 +20,7 @@ public final class ComposeService: ObservableObject {
 
     public func newDraft(from account: Account, to: [EmailAddress] = [], subject: String = "") throws -> Message {
         let draftsFolder = try repository.folder(accountId: account.id, role: .drafts)
-        let thread = Thread(
+        let thread = MailThread(
             accountId: account.id,
             subject: subject.isEmpty ? "(no subject)" : subject,
             folderIds: draftsFolder.map { [$0.id] } ?? []

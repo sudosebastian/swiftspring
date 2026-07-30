@@ -4,7 +4,7 @@ import SwiftspringKit
 struct ThreadListView: View {
     @ObservedObject var environment: AppEnvironment
 
-    private var displayedThreads: [Thread] {
+    private var displayedThreads: [MailThread] {
         if !environment.mail.searchQuery.isEmpty {
             return environment.mail.searchResults.isEmpty && environment.mail.searchQuery.count > 1
                 ? []
@@ -23,7 +23,7 @@ struct ThreadListView: View {
                 emptyState
             } else {
                 List(selection: Binding(
-                    get: { environment.mail.selectedThread?.id },
+                    get: { environment.mail.selectedMailThread?.id },
                     set: { id in
                         if let id, let thread = displayedThreads.first(where: { $0.id == id }) {
                             environment.mail.selectThread(thread)
@@ -96,7 +96,7 @@ struct ThreadListView: View {
     }
 
     @ViewBuilder
-    private func threadContextMenu(_ thread: Thread) -> some View {
+    private func threadContextMenu(_ thread: MailThread) -> some View {
         Button(thread.unread ? "Mark Read" : "Mark Unread") {
             Task {
                 try? await environment.mail.setUnread(threadIds: [thread.id], unread: !thread.unread)
@@ -124,7 +124,7 @@ struct ThreadListView: View {
 }
 
 struct ThreadRow: View {
-    let thread: Thread
+    let thread: MailThread
 
     private var sender: String {
         thread.participants.first?.name ?? thread.participants.first?.email ?? "Unknown"
