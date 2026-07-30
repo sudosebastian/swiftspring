@@ -91,7 +91,6 @@ public final class ComposeService: ObservableObject {
 
     public func saveDraft() throws {
         guard var draft else { return }
-        draft.subject = draft.subject
         draft.pristine = false
         draft.snippet = String(plainBody.prefix(140))
         try repository.upsertMessage(draft)
