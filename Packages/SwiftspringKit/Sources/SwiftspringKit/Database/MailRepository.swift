@@ -143,7 +143,7 @@ public struct MailRepository: Sendable {
                     arguments: [folderId, limit, offset]
                 )
             }
-            return try Thread
+            return try MailThread
                 .order(Column("lastMessageReceivedAt").desc)
                 .limit(limit, offset: offset)
                 .fetchAll(db)
@@ -172,7 +172,7 @@ public struct MailRepository: Sendable {
                         arguments: [folderId]
                     )
                 }
-                return try Thread
+                return try MailThread
                     .order(Column("lastMessageReceivedAt").desc)
                     .limit(200)
                     .fetchAll(db)
