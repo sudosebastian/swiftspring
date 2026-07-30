@@ -66,7 +66,13 @@ public struct RootMailboxView: View {
                     .keyboardShortcut("n", modifiers: [.command])
                 }
             }
-            .searchable(text: $environment.mail.searchQuery, prompt: "Search mail")
+            .searchable(
+                text: Binding(
+                    get: { environment.mail.searchQuery },
+                    set: { environment.mail.searchQuery = $0 }
+                ),
+                prompt: "Search mail"
+            )
             .onSubmit(of: .search) {
                 environment.mail.search()
             }

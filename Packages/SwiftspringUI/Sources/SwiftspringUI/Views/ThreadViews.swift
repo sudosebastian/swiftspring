@@ -5,16 +5,22 @@ struct ThreadListView: View {
     @ObservedObject var environment: AppEnvironment
 
     private var displayedThreads: [MailThread] {
-        if !environment.mail.searchQuery.isEmpty {
-            return environment.mail.searchResults.isEmpty && environment.mail.searchQuery.count > 1
-                ? []
-                : (environment.mail.searchResults.isEmpty ? environment.mail.threads.filter {
-                    $0.subject.localizedCaseInsensitiveContains(environment.mail.searchQuery)
-                        || $0.snippet.localizedCaseInsensitiveContains(environment.mail.searchQuery)
-                        || $0.participants.contains { $0.email.localizedCaseInsensitiveContains(environment.mail.searchQuery) || ($0.name?.localizedCaseInsensitiveContains(environment.mail.searchQuery) ?? false) }
-                } : environment.mail.searchResults)
+        let query = environment.mail.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return environment.mail.threads
         }
-        return environment.mail.threads
+        if !environment.mail.searchResults.isEmpty {
+            return environment.mail.searchResults
+        }
+        let lowered = query.lowercased()
+        return environment.mail.threads.filter { thread in
+            if thread.subject.lowercased().contains(lowered) { return true }
+            if thread.snippet.lowercased().contains(lowered) { return true }
+            return thread.participants.contains { person in
+                person.email.lowercased().contains(lowered)
+                    || (person.name?.lowercased().contains(lowered) ?? false)
+            }
+        }
     }
 
     var body: some View {
@@ -22,37 +28,7 @@ struct ThreadListView: View {
             if displayedThreads.isEmpty {
                 emptyState
             } else {
-                List(selection: Binding(
-                    get: { environment.mail.selectedMailThread?.id },
-                    set: { id in
-                        if let id, let thread = displayedThreads.first(where: { $0.id == id }) {
-                            environment.mail.selectThread(thread)
-                        }
-                    }
-                )) {
-                    ForEach(displayedThreads) { thread in
-                        ThreadRow(thread: thread)
-                            .tag(thread.id)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                            .contextMenu { threadContextMenu(thread) }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task { try? await environment.mail.trash(threadIds: [thread.id]) }
-                                } label: {
-                                    Label("Trash", systemImage: "trash")
-                                }
-                                Button {
-                                    Task { try? await environment.mail.archive(threadIds: [thread.id]) }
-                                } label: {
-                                    Label("Archive", systemImage: "archivebox")
-                                }
-                                .tint(SwiftspringBrand.spruceBright)
-                            }
-                    }
-                }
-                #if os(iOS)
-                .listStyle(.plain)
-                #endif
+                threadList
             }
         }
         .navigationTitle(environment.mail.selectedFolder?.name ?? "Unified Inbox")
@@ -70,6 +46,40 @@ struct ThreadListView: View {
                 .background(.ultraThinMaterial)
             }
         }
+    }
+
+    private var threadList: some View {
+        List(selection: Binding(
+            get: { environment.mail.selectedThread?.id },
+            set: { id in
+                guard let id,
+                      let thread = displayedThreads.first(where: { $0.id == id }) else { return }
+                environment.mail.selectThread(thread)
+            }
+        )) {
+            ForEach(displayedThreads) { thread in
+                ThreadRow(thread: thread)
+                    .tag(thread.id)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    .contextMenu { threadContextMenu(thread) }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { try? await environment.mail.trash(threadIds: [thread.id]) }
+                        } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                        Button {
+                            Task { try? await environment.mail.archive(threadIds: [thread.id]) }
+                        } label: {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        .tint(SwiftspringBrand.spruceBright)
+                    }
+            }
+        }
+        #if os(iOS)
+        .listStyle(.plain)
+        #endif
     }
 
     private var emptyState: some View {
