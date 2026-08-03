@@ -22,9 +22,9 @@ public actor InMemoryMailTransport: MailTransport {
                 RemoteMessageHeader(
                     uid: 1,
                     headerMessageId: "<welcome@swiftspring.local>",
-                    subject: "Welcome to Swiftspring",
+                    subject: "Welcome to SwiftSpring",
                     snippet: "Your native Apple mail client is ready — local sync, no Chromium.",
-                    from: [EmailAddress(name: "Swiftspring", email: "hello@swiftspring.app")],
+                    from: [EmailAddress(name: "SwiftSpring", email: "hello@swiftspring.app")],
                     to: [EmailAddress(email: "you@example.com")],
                     date: now.addingTimeInterval(-7200),
                     unread: true,
@@ -88,12 +88,12 @@ public actor InMemoryMailTransport: MailTransport {
                 html: """
                 <div style="font-family:-apple-system,sans-serif;line-height:1.5;color:#141F23">
                 <p style="font-size:22px;font-weight:600;margin:0 0 12px">Welcome aboard.</p>
-                <p>Swiftspring is a <strong>fully native</strong> mail client for Mac and iPhone.
+                <p>SwiftSpring is a <strong>fully native</strong> mail client for Mac and iPhone.
                 Sync runs in-process. Your credentials stay in Keychain.</p>
                 <p style="color:#1E7370">Try starring this thread, then search for “native”.</p>
                 </div>
                 """,
-                plainText: "Welcome aboard.\n\nSwiftspring is a fully native mail client for Mac and iPhone."
+                plainText: "Welcome aboard.\n\nSwiftSpring is a fully native mail client for Mac and iPhone."
             )
             bodies["INBOX:2"] = RemoteMessageBody(
                 html: """

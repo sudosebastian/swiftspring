@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">SwiftSpring</title>
+  <desc id="desc">A white paper plane and a spring-shaped flight path on a teal rounded-square background.</desc>
+  <defs>
+    <linearGradient id="background" x1="84" y1="50" x2="428" y2="462" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F3D3E"/>
+      <stop offset="1" stop-color="#1E7370"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="100%" height="100%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#082728" flood-opacity=".23"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="128" fill="url(#background)"/>
+  <path d="M126 347c49-80 104-79 147-25 44 55 86 49 125-17" fill="none" stroke="#F5EEE0" stroke-width="24" stroke-linecap="round"/>
+  <g filter="url(#shadow)" fill="#fff">
+    <path d="m122 159 263 75-119 45-44 97-100-217Z"/>
+    <path d="m166 195 100 84-44 97-56-181Z" fill="#E7F5F2"/>
+    <path d="m166 195 219 39-119 45-100-84Z" fill="#fff"/>
+  </g>
+  <circle cx="389" cy="145" r="16" fill="#DB5E4A"/>
+</svg>
