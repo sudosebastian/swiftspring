@@ -1,4 +1,4 @@
-name: Swiftspring
+name: SwiftSpring
 options:
   bundleIdPrefix: com.swiftspring
   deploymentTarget:
@@ -30,7 +30,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.swiftspring.mac
-        PRODUCT_NAME: Swiftspring
+        PRODUCT_NAME: SwiftSpring
         INFOPLIST_FILE: Apps/SwiftspringMac/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/SwiftspringMac/Resources/SwiftspringMac.entitlements
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
@@ -52,7 +52,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.swiftspring.ios
-        PRODUCT_NAME: Swiftspring
+        PRODUCT_NAME: SwiftSpring
         INFOPLIST_FILE: Apps/SwiftspringiOS/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/SwiftspringiOS/Resources/SwiftspringiOS.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"

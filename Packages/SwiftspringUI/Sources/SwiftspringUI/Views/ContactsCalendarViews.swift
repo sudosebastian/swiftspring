@@ -120,7 +120,7 @@ public struct CalendarListView: View {
         guard let account = environment.accounts.accounts.first else { return }
         let event = CalendarEvent(
             accountId: account.id,
-            title: "Swiftspring planning",
+            title: "SwiftSpring planning",
             location: "Native",
             startAt: Date().addingTimeInterval(86400),
             endAt: Date().addingTimeInterval(90000)
