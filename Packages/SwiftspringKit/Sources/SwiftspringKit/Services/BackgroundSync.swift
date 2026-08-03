@@ -10,11 +10,17 @@ public enum BackgroundSyncCoordinator {
 
     @MainActor
     private static var syncEngine: SyncEngine?
+    @MainActor
+    private static var localFeatureScheduler: LocalFeatureScheduler?
 
     /// Bind the live sync engine so background refresh can sync the open mailbox.
     @MainActor
-    public static func bind(syncEngine: SyncEngine) {
+    public static func bind(
+        syncEngine: SyncEngine,
+        localFeatureScheduler: LocalFeatureScheduler? = nil
+    ) {
         self.syncEngine = syncEngine
+        self.localFeatureScheduler = localFeatureScheduler
     }
 
     @MainActor
@@ -49,6 +55,9 @@ public enum BackgroundSyncCoordinator {
     public static func performRefresh() async -> Bool {
         if let engine = await MainActor.run(body: { syncEngine }) {
             await engine.startAll()
+            if let scheduler = await MainActor.run(body: { localFeatureScheduler }) {
+                _ = await scheduler.processDue()
+            }
             return true
         }
         do {
@@ -60,6 +69,8 @@ public enum BackgroundSyncCoordinator {
                 transportFactory: { MailTransportFactory.make() }
             )
             await engine.startAll()
+            let scheduler = LocalFeatureScheduler(repository: repository, syncEngine: engine)
+            _ = await scheduler.processDue()
             return true
         } catch {
             return false

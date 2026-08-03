@@ -11,7 +11,10 @@ struct SwiftspringiOSApp: App {
         BackgroundSyncCoordinator.register()
         let env = (try? AppEnvironment.bootstrap())
             ?? (try! AppEnvironment.preview())
-        BackgroundSyncCoordinator.bind(syncEngine: env.syncEngine)
+        BackgroundSyncCoordinator.bind(
+            syncEngine: env.syncEngine,
+            localFeatureScheduler: env.featureScheduler
+        )
         BackgroundSyncCoordinator.schedule()
         _environment = StateObject(wrappedValue: env)
     }
@@ -22,6 +25,7 @@ struct SwiftspringiOSApp: App {
                 .preferredColorScheme(colorScheme)
                 .onAppear {
                     BackgroundSyncCoordinator.schedule()
+                    environment.startLocalFeatureScheduler()
                 }
         }
     }

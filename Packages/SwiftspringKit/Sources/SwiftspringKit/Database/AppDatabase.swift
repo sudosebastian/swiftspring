@@ -222,6 +222,81 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        // Local-first replacements for features that historically depended on a
+        // Mailspring ID. None of these rows are synced to a third party: they
+        // live alongside the mailbox database on this device.
+        migrator.registerMigration("v3_local_feature_services") { db in
+            try db.create(table: "mailTemplate") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("subject", .text).notNull().defaults(to: "")
+                t.column("htmlBody", .text).notNull().defaults(to: "")
+                t.column("plainBody", .text).notNull().defaults(to: "")
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull().indexed()
+            }
+
+            try db.create(table: "scheduledSend") { t in
+                t.column("id", .text).primaryKey()
+                t.column("accountId", .text).notNull().indexed()
+                    .references("account", onDelete: .cascade)
+                t.column("messageId", .text).notNull().unique()
+                    .references("message", onDelete: .cascade)
+                t.column("sendAt", .datetime).notNull().indexed()
+                t.column("status", .text).notNull().indexed()
+                t.column("createdAt", .datetime).notNull()
+                t.column("completedAt", .datetime)
+                t.column("errorMessage", .text)
+            }
+
+            try db.create(table: "followUpReminder") { t in
+                t.column("id", .text).primaryKey()
+                t.column("accountId", .text).notNull().indexed()
+                    .references("account", onDelete: .cascade)
+                t.column("threadId", .text).notNull().indexed()
+                    .references("thread", onDelete: .cascade)
+                t.column("sentMessageId", .text)
+                    .references("message", onDelete: .setNull)
+                t.column("remindAt", .datetime).notNull().indexed()
+                t.column("lastIncomingAt", .datetime).notNull()
+                t.column("status", .text).notNull().indexed()
+                t.column("createdAt", .datetime).notNull()
+                t.column("completedAt", .datetime)
+            }
+
+            try db.create(table: "localActivityEvent") { t in
+                t.column("id", .text).primaryKey()
+                t.column("accountId", .text).notNull().indexed()
+                    .references("account", onDelete: .cascade)
+                t.column("messageId", .text).indexed()
+                    .references("message", onDelete: .setNull)
+                t.column("threadId", .text).indexed()
+                    .references("thread", onDelete: .setNull)
+                t.column("kind", .text).notNull().indexed()
+                t.column("occurredAt", .datetime).notNull().indexed()
+                t.column("metadataJSON", .text).notNull().defaults(to: "{}")
+            }
+
+            // The gateway is deliberately opt-in. It is for self-hosted public
+            // tracking/share endpoints, not a Mailspring service or identity.
+            try db.create(table: "selfHostedGateway") { t in
+                t.column("id", .text).primaryKey()
+                t.column("baseURL", .text).notNull()
+                t.column("trackingEnabled", .boolean).notNull().defaults(to: false)
+                t.column("sharingEnabled", .boolean).notNull().defaults(to: false)
+                t.column("updatedAt", .datetime).notNull()
+            }
+        }
+
+        migrator.registerMigration("v4_local_text_services") { db in
+            try db.create(table: "localTextService") { t in
+                t.column("id", .text).primaryKey()
+                t.column("languageToolURL", .text)
+                t.column("translationURL", .text)
+                t.column("updatedAt", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 }

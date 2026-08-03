@@ -134,17 +134,26 @@ public struct MailRepository: Sendable {
                     sql: """
                     SELECT thread.* FROM thread
                     INNER JOIN threadFolder ON threadFolder.threadId = thread.id
+                    LEFT JOIN snooze ON snooze.threadId = thread.id
                     WHERE threadFolder.folderId = ?
+                    AND (snooze.id IS NULL OR snooze.wakeAt <= ?)
                     ORDER BY thread.lastMessageReceivedAt DESC
                     LIMIT ? OFFSET ?
                     """,
-                    arguments: [folderId, limit, offset]
+                    arguments: [folderId, Date(), limit, offset]
                 )
             }
-            return try MailThread
-                .order(Column("lastMessageReceivedAt").desc)
-                .limit(limit, offset: offset)
-                .fetchAll(db)
+            return try MailThread.fetchAll(
+                db,
+                sql: """
+                SELECT thread.* FROM thread
+                LEFT JOIN snooze ON snooze.threadId = thread.id
+                WHERE snooze.id IS NULL OR snooze.wakeAt <= ?
+                ORDER BY thread.lastMessageReceivedAt DESC
+                LIMIT ? OFFSET ?
+                """,
+                arguments: [Date(), limit, offset]
+            )
         }
     }
 
@@ -163,17 +172,26 @@ public struct MailRepository: Sendable {
                         sql: """
                         SELECT thread.* FROM thread
                         INNER JOIN threadFolder ON threadFolder.threadId = thread.id
+                        LEFT JOIN snooze ON snooze.threadId = thread.id
                         WHERE threadFolder.folderId = ?
+                        AND (snooze.id IS NULL OR snooze.wakeAt <= ?)
                         ORDER BY thread.lastMessageReceivedAt DESC
                         LIMIT 200
                         """,
-                        arguments: [folderId]
+                        arguments: [folderId, Date()]
                     )
                 }
-                return try MailThread
-                    .order(Column("lastMessageReceivedAt").desc)
-                    .limit(200)
-                    .fetchAll(db)
+                return try MailThread.fetchAll(
+                    db,
+                    sql: """
+                    SELECT thread.* FROM thread
+                    LEFT JOIN snooze ON snooze.threadId = thread.id
+                    WHERE snooze.id IS NULL OR snooze.wakeAt <= ?
+                    ORDER BY thread.lastMessageReceivedAt DESC
+                    LIMIT 200
+                    """,
+                    arguments: [Date()]
+                )
             }
             .publisher(in: db.dbWriter)
             .eraseToAnyPublisher()

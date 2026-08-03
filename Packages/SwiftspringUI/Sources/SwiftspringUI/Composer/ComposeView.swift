@@ -13,6 +13,9 @@ public struct ComposeView: View {
     @State private var bodyText = ""
     @State private var errorMessage: String?
     @State private var showImporter = false
+    @State private var showSchedulePopover = false
+    @State private var scheduledAt = Date().addingTimeInterval(60 * 60)
+    @State private var templates: [MailTemplate] = []
     @FocusState private var focusedField: Field?
 
     private enum Field { case to, subject, body }
@@ -57,12 +60,57 @@ public struct ComposeView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
+                    Menu {
+                        if templates.isEmpty {
+                            Text("No local templates yet")
+                        } else {
+                            ForEach(templates) { template in
+                                Button(template.name) { apply(template) }
+                            }
+                        }
+                        Divider()
+                        Button("Save as Template") { saveAsTemplate() }
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .help("Local templates")
+
                     Button {
                         showImporter = true
                     } label: {
                         Image(systemName: "paperclip")
                     }
                     .help("Attach files")
+
+                    Button {
+                        showSchedulePopover = true
+                    } label: {
+                        Image(systemName: "clock")
+                    }
+                    .help("Send later")
+                    .disabled(toText.isEmpty || environment.compose.isSending)
+                    .popover(isPresented: $showSchedulePopover, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("Send later")
+                                .font(.headline)
+                            DatePicker(
+                                "Deliver on",
+                                selection: $scheduledAt,
+                                in: Date()...,
+                                displayedComponents: [.date, .hourAndMinute]
+                            )
+                            HStack {
+                                Button("Cancel") { showSchedulePopover = false }
+                                Spacer()
+                                Button("Schedule") {
+                                    Task { await scheduleSend() }
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                        }
+                        .padding()
+                        .frame(minWidth: 300)
+                    }
 
                     Button {
                         Task { await send() }
@@ -89,6 +137,7 @@ public struct ComposeView: View {
             }
             .onAppear {
                 populateFromDraft()
+                templates = (try? environment.templates.all()) ?? []
                 focusedField = toText.isEmpty ? .to : .body
             }
         }
@@ -187,30 +236,73 @@ public struct ComposeView: View {
     }
 
     private func send() async {
-        guard let account = environment.accounts.accounts.first else { return }
         errorMessage = nil
         do {
-            if environment.compose.draft == nil {
-                _ = try environment.compose.newDraft(from: account)
-            }
-            let to = parseAddresses(toText)
-            let cc = parseAddresses(ccText)
-            try environment.compose.updateRecipients(to: to, cc: cc)
-            try environment.compose.updateSubject(subject)
-            environment.compose.plainBody = bodyText
-            environment.compose.htmlBody = bodyText
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .map { line -> String in
-                    let trimmed = String(line)
-                    return trimmed.isEmpty ? "<br>" : "<p>\(trimmed)</p>"
-                }
-                .joined()
+            try prepareDraft()
             try await environment.compose.send(undoDelaySeconds: 3)
             environment.notifications.status = "Message sent"
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func scheduleSend() async {
+        errorMessage = nil
+        do {
+            try prepareDraft()
+            guard let draft = environment.compose.draft else { return }
+            _ = try environment.scheduledSends.schedule(messageId: draft.id, at: scheduledAt)
+            environment.notifications.status = "Scheduled for \(scheduledAt.formatted(date: .abbreviated, time: .shortened))"
+            showSchedulePopover = false
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func prepareDraft() throws {
+        guard let account = environment.accounts.accounts.first else { return }
+        if environment.compose.draft == nil {
+            _ = try environment.compose.newDraft(from: account)
+        }
+        try environment.compose.updateRecipients(to: parseAddresses(toText), cc: parseAddresses(ccText))
+        try environment.compose.updateSubject(subject)
+        environment.compose.plainBody = bodyText
+        environment.compose.htmlBody = bodyText
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                let trimmed = String(line)
+                return trimmed.isEmpty ? "<br>" : "<p>\(trimmed)</p>"
+            }
+            .joined()
+        try environment.compose.saveDraft()
+    }
+
+    private func saveAsTemplate() {
+        let name = subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Untitled template"
+            : subject
+        let template = MailTemplate(
+            name: name,
+            subject: subject,
+            htmlBody: environment.compose.htmlBody,
+            plainBody: bodyText
+        )
+        do {
+            try environment.templates.save(template)
+            templates = try environment.templates.all()
+            environment.notifications.status = "Saved local template"
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func apply(_ template: MailTemplate) {
+        subject = template.subject
+        bodyText = template.plainBody
+        environment.compose.htmlBody = template.htmlBody
+        environment.compose.plainBody = template.plainBody
     }
 
     private func parseAddresses(_ raw: String) -> [EmailAddress] {
@@ -272,10 +364,128 @@ public struct PreferencesView: View {
 
             MailRulesPreferences(environment: environment)
                 .tabItem { Label("Rules", systemImage: "list.bullet.rectangle") }
+
+            LocalFeaturesPreferences(environment: environment)
+                .tabItem { Label("Local Features", systemImage: "externaldrive") }
         }
         #if os(macOS)
         .frame(minWidth: 560, minHeight: 420)
         #endif
+    }
+}
+
+struct LocalFeaturesPreferences: View {
+    @ObservedObject var environment: AppEnvironment
+    @State private var gatewayURL = ""
+    @State private var trackingEnabled = true
+    @State private var sharingEnabled = true
+    @State private var languageToolURL = ""
+    @State private var translationURL = ""
+    @State private var status: String?
+
+    var body: some View {
+        Form {
+            Section("On this device") {
+                Label("Templates, scheduled send, snooze, reminders, contacts, and activity are stored locally.", systemImage: "lock.shield")
+                    .foregroundStyle(.secondary)
+                Label("Scheduled messages send the next time this device is running if it was asleep at their scheduled time.", systemImage: "clock.arrow.circlepath")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Self-hosted gateway") {
+                Text("Read receipts, link tracking, and shareable links need a public HTTPS service you operate. Swiftspring never uses a Mailspring ID or server.")
+                    .foregroundStyle(.secondary)
+                TextField("https://mail.example.com", text: $gatewayURL)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+                Toggle("Enable read receipts and link tracking", isOn: $trackingEnabled)
+                Toggle("Enable shared conversation links", isOn: $sharingEnabled)
+                HStack {
+                    Button("Remove gateway", role: .destructive) {
+                        do {
+                            try environment.gateway.remove()
+                            gatewayURL = ""
+                            status = "Gateway removed"
+                        } catch {
+                            status = error.localizedDescription
+                        }
+                    }
+                    .disabled(gatewayURL.isEmpty)
+                    Spacer()
+                    Button("Save gateway") { saveGateway() }
+                        .buttonStyle(.borderedProminent)
+                }
+                if let status {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Local language services") {
+                Text("Grammar and translation text stays on this device when these endpoints point to services on localhost.")
+                    .foregroundStyle(.secondary)
+                TextField("LanguageTool URL (for example, http://127.0.0.1:8081/v2/check)", text: $languageToolURL)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+                TextField("LibreTranslate URL (for example, http://127.0.0.1:5000/translate)", text: $translationURL)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+                Button("Save local text services") { saveTextServices() }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .onAppear(perform: loadGateway)
+    }
+
+    private func loadGateway() {
+        guard let gateway = try? environment.gateway.current() else { return }
+        gatewayURL = gateway.baseURL
+        trackingEnabled = gateway.trackingEnabled
+        sharingEnabled = gateway.sharingEnabled
+        let configuredTextServices = (try? environment.localTextServices.current()) ?? nil
+        if let textServices = configuredTextServices {
+            languageToolURL = textServices.languageToolURL ?? ""
+            translationURL = textServices.translationURL ?? ""
+        }
+    }
+
+    private func saveGateway() {
+        do {
+            try environment.gateway.save(SelfHostedGateway(
+                baseURL: gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                trackingEnabled: trackingEnabled,
+                sharingEnabled: sharingEnabled
+            ))
+            status = "Gateway saved"
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func saveTextServices() {
+        do {
+            try environment.localTextServices.save(LocalTextServiceConfiguration(
+                languageToolURL: languageToolURL.nilIfBlank,
+                translationURL: translationURL.nilIfBlank
+            ))
+            status = "Local text services saved"
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

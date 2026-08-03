@@ -97,6 +97,7 @@ public struct RootMailboxView: View {
                 #endif
         }
         .task {
+            environment.startLocalFeatureScheduler()
             if environment.accounts.accounts.isEmpty {
                 // Welcome already handled demo; if user skipped, keep empty until add account.
             } else {

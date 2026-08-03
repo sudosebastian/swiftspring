@@ -15,8 +15,19 @@ public final class AppEnvironment: ObservableObject {
     public let snooze: SnoozeService
     public let rules: MailRulesService
     public let contacts: ContactService
+    public let templates: TemplateService
+    public let scheduledSends: ScheduledSendService
+    public let followUpReminders: FollowUpReminderService
+    public let activity: LocalActivityService
+    public let gateway: SelfHostedGatewayService
+    public let localTextServices: LocalTextServiceSettings
+    public let grammar: LocalGrammarService
+    public let translation: LocalTranslationService
+    public let featureScheduler: LocalFeatureScheduler
     public let notifications: NotificationService
     public let calendar: CalendarService
+
+    private var localFeatureSchedulerTask: Task<Void, Never>?
 
     /// Shared demo transport so account connect + sync see the same seeded mailbox.
     public let sharedDemoTransport: InMemoryMailTransport
@@ -61,9 +72,50 @@ public final class AppEnvironment: ObservableObject {
         self.snooze = SnoozeService(repository: repository)
         self.rules = MailRulesService(repository: repository)
         self.contacts = ContactService(repository: repository)
+        self.templates = TemplateService(repository: repository)
+        self.scheduledSends = ScheduledSendService(repository: repository)
+        self.followUpReminders = FollowUpReminderService(repository: repository)
+        self.activity = LocalActivityService(repository: repository)
+        self.gateway = SelfHostedGatewayService(repository: repository)
+        let textServices = LocalTextServiceSettings(repository: repository)
+        self.localTextServices = textServices
+        self.grammar = LocalGrammarService(settings: textServices)
+        self.translation = LocalTranslationService(settings: textServices)
+        self.featureScheduler = LocalFeatureScheduler(repository: repository, syncEngine: engine)
         self.notifications = NotificationService()
         self.calendar = CalendarService(repository: repository)
         self.mail.contacts = self.contacts
+    }
+
+    /// Starts the on-device scheduler while the app is open. Background refresh
+    /// invokes the same processor when the operating system grants time.
+    public func startLocalFeatureScheduler() {
+        guard localFeatureSchedulerTask == nil else { return }
+        localFeatureSchedulerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.processLocalFeatures()
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
+    }
+
+    public func stopLocalFeatureScheduler() {
+        localFeatureSchedulerTask?.cancel()
+        localFeatureSchedulerTask = nil
+    }
+
+    public func processLocalFeatures(now: Date = Date()) async {
+        let result = await featureScheduler.processDue(now: now)
+        if !result.sentMessageIDs.isEmpty {
+            notifications.status = "Sent \(result.sentMessageIDs.count) scheduled message\(result.sentMessageIDs.count == 1 ? "" : "s")"
+        }
+        if !result.dueReminderThreadIDs.isEmpty {
+            notifications.status = "\(result.dueReminderThreadIDs.count) follow-up reminder\(result.dueReminderThreadIDs.count == 1 ? "" : "s") due"
+        }
+        if !result.unsnoozedThreadIDs.isEmpty {
+            notifications.status = "\(result.unsnoozedThreadIDs.count) snoozed conversation\(result.unsnoozedThreadIDs.count == 1 ? "" : "s") returned"
+        }
     }
 
     /// Boots the shared application environment.

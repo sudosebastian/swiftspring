@@ -89,6 +89,148 @@ final class MailRulesTests: XCTestCase {
     }
 }
 
+final class LocalFeatureServicesTests: XCTestCase {
+    func testTemplatesAndGatewayStayLocal() throws {
+        let db = try AppDatabase.openInMemory()
+        let repository = MailRepository(db: db)
+        let templates = TemplateService(repository: repository)
+        let gateway = SelfHostedGatewayService(repository: repository)
+
+        let template = MailTemplate(
+            name: "Follow up",
+            subject: "Checking in",
+            htmlBody: "<p>Hello</p>",
+            plainBody: "Hello"
+        )
+        try templates.save(template)
+        XCTAssertEqual(try templates.all().map(\.name), ["Follow up"])
+
+        XCTAssertThrowsError(try gateway.save(SelfHostedGateway(baseURL: "http://localhost:8080")))
+        try gateway.save(SelfHostedGateway(baseURL: "https://mail.example.com"))
+        XCTAssertTrue(try gateway.isEnabled(.openTracking))
+        XCTAssertTrue(try gateway.isEnabled(.threadSharing))
+    }
+
+    func testTextServiceConfigurationOnlyAcceptsLoopbackEndpoints() throws {
+        let db = try AppDatabase.openInMemory()
+        let settings = LocalTextServiceSettings(repository: MailRepository(db: db))
+        XCTAssertThrowsError(try settings.save(LocalTextServiceConfiguration(
+            languageToolURL: "https://grammar.example.com/v2/check"
+        )))
+        try settings.save(LocalTextServiceConfiguration(
+            languageToolURL: "http://127.0.0.1:8081/v2/check",
+            translationURL: "http://localhost:5000/translate"
+        ))
+        let current = try settings.current()
+        XCTAssertEqual(current?.languageToolURL, "http://127.0.0.1:8081/v2/check")
+        XCTAssertEqual(current?.translationURL, "http://localhost:5000/translate")
+    }
+
+    func testDueReminderIsCancelledWhenThreadReceivedAReply() throws {
+        let db = try AppDatabase.openInMemory()
+        let repository = MailRepository(db: db)
+        let account = Account(
+            name: "Test",
+            emailAddress: "test@example.com",
+            provider: .imap,
+            imap: ServerSettings(host: "imap.example.com", port: 993, username: "test@example.com"),
+            smtp: ServerSettings(host: "smtp.example.com", port: 587, username: "test@example.com")
+        )
+        try repository.upsertAccount(account)
+        var thread = MailThread(
+            accountId: account.id,
+            subject: "Waiting",
+            lastMessageReceivedAt: Date(timeIntervalSince1970: 100)
+        )
+        try repository.upsertThread(thread)
+        let service = FollowUpReminderService(repository: repository)
+        let reminder = try service.schedule(
+            threadId: thread.id,
+            at: Date(timeIntervalSince1970: 200)
+        )
+        thread.lastMessageReceivedAt = Date(timeIntervalSince1970: 300)
+        try repository.upsertThread(thread)
+
+        let due = try service.claimDue(now: Date(timeIntervalSince1970: 400))
+        XCTAssertEqual(due.map(\.id), [reminder.id])
+        let stored = try db.dbWriter.read { database in
+            try FollowUpReminder.fetchOne(database, key: reminder.id)
+        }
+        XCTAssertEqual(stored?.status, .processing)
+    }
+
+    func testSnoozedThreadIsHiddenUntilItsWakeDate() throws {
+        let db = try AppDatabase.openInMemory()
+        let repository = MailRepository(db: db)
+        let account = Account(
+            name: "Test",
+            emailAddress: "test@example.com",
+            provider: .imap,
+            imap: ServerSettings(host: "imap.example.com", port: 993, username: "test@example.com"),
+            smtp: ServerSettings(host: "smtp.example.com", port: 587, username: "test@example.com")
+        )
+        try repository.upsertAccount(account)
+        let inbox = MailFolder(accountId: account.id, path: "INBOX", name: "Inbox", role: .inbox)
+        try repository.upsertFolder(inbox)
+        let thread = MailThread(accountId: account.id, subject: "Snoozed", folderIds: [inbox.id])
+        try repository.upsertThread(thread)
+
+        try SnoozeService(repository: repository).snooze(
+            threadId: thread.id,
+            accountId: account.id,
+            until: Date().addingTimeInterval(60)
+        )
+        XCTAssertTrue(try repository.threads(folderId: inbox.id).isEmpty)
+    }
+
+    @MainActor
+    func testSchedulerSendsDueDraftAndRecordsLocalActivity() async throws {
+        let db = try AppDatabase.openInMemory()
+        let credentials = InMemoryCredentialStore()
+        let transport = InMemoryMailTransport(seedDemoMail: false)
+        let repository = MailRepository(db: db)
+        let engine = SyncEngine(repository: repository, credentials: credentials, transportFactory: { transport })
+        let accounts = AccountService(
+            repository: repository,
+            credentials: credentials,
+            syncEngine: engine,
+            transportFactory: { transport }
+        )
+        let account = try await accounts.addIMAPAccount(
+            name: "Demo",
+            email: "you@example.com",
+            provider: .imap,
+            password: "demo",
+            imap: ServerSettings(host: "localhost", port: 993, username: "you@example.com"),
+            smtp: ServerSettings(host: "localhost", port: 587, username: "you@example.com")
+        )
+        let compose = ComposeService(repository: repository, syncEngine: engine)
+        let draft = try compose.newDraft(
+            from: account,
+            to: [EmailAddress(email: "recipient@example.com")],
+            subject: "Scheduled"
+        )
+        compose.plainBody = "Hello later"
+        compose.htmlBody = "<p>Hello later</p>"
+        try compose.saveDraft()
+        let scheduled = ScheduledSendService(repository: repository)
+        _ = try scheduled.schedule(messageId: draft.id, at: Date(timeIntervalSince1970: 10))
+
+        let scheduler = LocalFeatureScheduler(repository: repository, syncEngine: engine)
+        let result = await scheduler.processDue(now: Date(timeIntervalSince1970: 20))
+
+        XCTAssertEqual(result.sentMessageIDs, [draft.id])
+        XCTAssertFalse(try repository.message(id: draft.id)?.draft ?? true)
+        XCTAssertEqual(try scheduled.scheduled(for: draft.id)?.status, .completed)
+        let events = try LocalActivityService(repository: repository).events(
+            accountId: account.id,
+            from: .distantPast,
+            to: .distantFuture
+        )
+        XCTAssertEqual(events.map(\.kind), [.messageSent])
+    }
+}
+
 final class ThreadFolderTests: XCTestCase {
     func testUpsertThreadReplacesFolderMembership() throws {
         let db = try AppDatabase.openInMemory()

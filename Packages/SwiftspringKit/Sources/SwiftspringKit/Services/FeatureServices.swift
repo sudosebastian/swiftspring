@@ -59,6 +59,7 @@ public struct SnoozeService: Sendable {
     public func snooze(threadId: EntityID, accountId: EntityID, until wakeAt: Date) throws {
         let record = SnoozeRecord(threadId: threadId, accountId: accountId, wakeAt: wakeAt)
         try repository.db.dbWriter.write { db in
+            _ = try SnoozeRecord.filter(Column("threadId") == threadId).deleteAll(db)
             try record.save(db)
         }
     }
